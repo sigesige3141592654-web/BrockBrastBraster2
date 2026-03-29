@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{margin:0;font-family:sans-serif;height:100vh;display:flex;flex-direction:column}
+.hidden{display:none}
+
+.top{flex:1;display:flex;justify-content:center;align-items:center;flex-direction:column}
+.topButtons{display:flex;gap:10px;margin-top:10px}
+.bottom{flex:1;overflow:auto;border-top:2px solid black}
+
+#grid,#resultGrid{
+  display:grid;
+  grid-template-columns:repeat(8,30px);
+  grid-template-rows:repeat(8,30px);
+}
+.cell{border:1px solid black;background:white;position:relative}
+.active{background:yellowgreen}
+
+.mainBtn{margin-top:10px;padding:12px;font-size:18px}
+.backBtn{font-size:1.5em;position:fixed;bottom:10px;left:10px;z-index:1000}
+
+.slotArea{
+  padding:10px;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+}
+.slot{
+  position:relative;
+  min-height:90px;
+  border:1px solid #999;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  background:white;
+  cursor:pointer;
+  overflow:hidden;
+}
+.slotLabel{
+  position:absolute;
+  top:4px;
+  left:4px;
+  font-size:12px;
+  background:black;
+  color:white;
+  padding:2px 4px;
+}
+.slotEmpty{
+  font-size:12px;
+  color:#666;
+}
+.slotNote{
+  padding:0 10px 8px;
+  font-size:12px;
+  color:#444;
+  text-align:center;
+}
+
+.container{
+  padding:10px;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+}
+.canvasBox{
+  position:relative;
+  padding:10px;
+  border:1px solid #ccc;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  cursor:pointer;
+  aspect-ratio:1/1;
+  background:white;
+}
+canvas{display:block}
+.selected{outline:3px solid yellowgreen}
+
+.badge{
+  position:absolute;
+  top:2px;
+  left:4px;
+  font-size:12px;
+  background:black;
+  color:white;
+  padding:2px 4px;
+  border-radius:2px;
+}
+
+#viewTop{margin-top:10px}
+
+.miniWrap{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:5px;
+  padding:10px;
+}
+.miniBox{font-size:10px;text-align:center}
+
+.editorTop{
+  display:flex;
+  justify-content:center;
+  align-items:center; /* 追加：縦中央 */
+  padding-top:10px;
+  position:relative;
+  flex:1; /* 追加：高さを使う */
+}
+
+#editGrid{
+  display:grid;
+  grid-template-columns:repeat(8,39px);
+  grid-template-rows:repeat(8,39px);
+}
+
+.editorBottom{
+  padding:10px;
+}
+
+.btnRow{
+  display:flex;
+  gap:10px;
+  margin-bottom:10px;
+}
+
+.ctrlBtn{
+  flex:1;
+  padding:14px;
+  font-size:16px;
+  border:none;
+  background:#ddd;
+  border-radius:8px;
+}
+
+.ctrlBtn:active{
+  background:#aaa;
+}
+
+.activeBtn{
+  background:yellowgreen;
+}
+#overlayWrap{
+  position:absolute;
+  pointer-events:none;
+  z-index:10; /* 追加：前面に出す */
+}
+
+#overlayImg{
+  position:absolute;
+  top:0;
+  left:0;
+}
+
+#overlayInfo{
+  font-size:14px;
+  padding:5px;
+}
+
+
+
+
+
+input[type="file"].ctrlBtn{
+  padding:10px;
+  font-size:14px;
+  background:#ddd;
+  border-radius:8px;
+}
+
+.noScroll{
+  overflow:hidden;
+  height:100vh;
+  touch-action:none;
+}
+
+
+
+</style>
+</head>
+<body>
+
+<div id="selectScreen">
+  <div class="top">
+    <div id="grid"></div>
+    <div class="topButtons">
+      <button class="mainBtn" onclick="openEditor()">マップ編集</button>
+      <button class="mainBtn" onclick="run()">配置開始</button>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="slotArea" id="slotArea"></div>
+    <div class="slotNote">同じ形を3回選べます。上のb/c/d枠をタップすると消せます。</div>
+    <div class="container" id="list"></div>
+  </div>
+</div>
+
+<div id="viewScreen" class="hidden">
+  <button class="backBtn" onclick="back()">戻る</button>
+  <div id="viewTop"></div>
+  <div class="top">
+    <div id="resultGrid"></div>
+  </div>
+  <div id="count"></div>
+  <div class="miniWrap" id="mini"></div>
+</div>
+
+<div id="editorScreen" class="hidden">
+  <button class="backBtn" onclick="closeEditor()">戻る</button>
+
+  <div class="editorTop">
+  
+  <div id="editGrid"></div>
+  </div>
+
+  <div id="overlayWrap"> 
+  <img id="overlayImg">
+  </div>
+
+
+  <div class="editorBottom">
+    <div class="btnRow">
+      <button class="ctrlBtn activeBtn" id="modeToggle" onclick="setMode('toggle')">トグル</button>
+      <button class="ctrlBtn" id="modeOn" onclick="setMode('on')">ON</button>
+      <button class="ctrlBtn" id="modeOff" onclick="setMode('off')">OFF</button>
+    </div>
+
+    <div class="btnRow">
+      <button class="ctrlBtn" onclick="clearAll()">全消去</button>
+      <button class="ctrlBtn" onclick="invertAll()">反転</button>
+    </div>
+    <div class="btnRow">
+      <button class="ctrlBtn" onclick="undo()">Undo</button>
+      <button class="ctrlBtn" onclick="redo()">Redo</button>
+    </div>
+
+    <input type="file" accept="image/*" onchange="loadImage(event)" class="ctrlBtn">
+    
+    <div class="btnRow">
+      <button class="ctrlBtn" onclick="opacityUp()">透明+</button>
+      <button class="ctrlBtn" onclick="opacityDown()">透明-</button>
+    </div>
+
+    <div id="overlayInfo">
+    </div>
+    
+  </div>  
+
+
+
+
+
+<script>
+let overlayX=-394;
+let overlayY=-1387;
+let overlayScale=0.3;
+let overlayOpacity=0.5;
+
+function loadImage(e){
+  const file=e.target.files[0];
+  if(!file) return;
+  const url=URL.createObjectURL(file);
+  document.getElementById("overlayImg").src=url;
+  // 初期値を強制適用
+  overlayX=-394;
+  overlayY=-1387;
+  overlayScale=0.3;
+  updateOverlay();
+}
+function updateOverlay(){
+  const img=document.getElementById("overlayImg");
+
+  img.style.transform=`translate(${overlayX}px,${overlayY}px) scale(${overlayScale})`;
+  img.style.opacity=overlayOpacity;
+
+  document.getElementById("overlayInfo").textContent=
+    `x:${overlayX} y:${overlayY} scale:${overlayScale} opacity:${overlayOpacity}`;
+}
+function moveX(v){ overlayX+=v; updateOverlay(); }
+function moveY(v){ overlayY+=v; updateOverlay(); }
+
+function scaleUp(){ overlayScale+=0.01; updateOverlay(); }
+function scaleDown(){ overlayScale=Math.max(0.01,overlayScale-0.01); updateOverlay(); }
+
+function opacityUp(){
+  overlayOpacity=Math.min(1,overlayOpacity+0.1);
+  updateOverlay();
+}
+
+function opacityDown(){
+  overlayOpacity=Math.max(0,overlayOpacity-0.1);
+  updateOverlay();
+}
+
+function resetOverlay(){
+  overlayX=0;
+  overlayY=0;
+  overlayScale=1;
+  overlayOpacity=0.5;
+  updateOverlay();
+}
+function openEditor(){
+  document.getElementById("selectScreen").classList.add("hidden");
+  document.getElementById("editorScreen").classList.remove("hidden");
+  document.body.classList.add("noScroll"); // ▼追加
+  drawEdit();
+}
+function closeEditor(){
+  document.getElementById("editorScreen").classList.add("hidden");
+  document.getElementById("selectScreen").classList.remove("hidden");
+  document.body.classList.remove("noScroll"); // ▼追加
+  // ▼追加：元グリッド再描画
+  redrawMainGrid();
+}
+
+
+const colors=["#00ff00","#00ffff","#ff00ff"];
+
+const a=Array.from({length:8},()=>Array(8).fill(0));
+const grid=document.getElementById("grid");
+
+const editGrid=document.getElementById("editGrid");
+let mode="toggle";
+let isTouch=false;
+
+function drawEdit(){
+  editGrid.innerHTML="";
+  for(let y=0;y<8;y++){
+    for(let x=0;x<8;x++){
+      const c=document.createElement("div");
+      c.className="cell";
+      if(a[y][x]) c.classList.add("active");
+
+      c.onclick=()=>{
+      applyCell(y,x); // 単体タップ
+      };
+
+      c.ontouchstart=()=>{
+      isTouch=true;
+      applyCell(y,x);
+      };
+      c.ontouchmove=(e)=>{
+        const t=e.touches[0];
+        const el=document.elementFromPoint(t.clientX,t.clientY);
+        if(el && el.parentNode===editGrid){
+          const i=[...editGrid.children].indexOf(el);
+          const yy=Math.floor(i/8);
+          const xx=i%8;
+          applyCell(yy,xx);
+        }
+      };
+      c.ontouchend=()=>isTouch=false;
+
+      editGrid.appendChild(c);
+    }
+  }
+}
+
+for(let y=0;y<8;y++){
+  for(let x=0;x<8;x++){
+    const c=document.createElement("div");
+    c.className="cell";
+    c.onclick=()=>{
+      a[y][x]^=1;
+      c.classList.toggle("active");
+    };
+    grid.appendChild(c);
+  }
+}
+
+const shapes=[
+[[1]],[[1,1]],[[1],[1]],[[0,1],[1,0]],[[1,0],[0,1]],
+[[0,1],[1,1]],[[1,0],[1,1]],[[1,1],[0,1]],[[1,1],[1,0]],
+[[1,1],[1,1]],
+[[1,1,1]],[[1],[1],[1]],
+
+// ▼ ここから追加（Z系4つ）
+[[1,1,0],[0,1,1]],        // Z 横
+[[0,1],[1,1],[1,0]],      // Z 縦
+[[0,1,1],[1,1,0]],        // 逆Z 横
+[[1,0],[1,1],[0,1]],      // 逆Z 縦
+
+// Tミノ 上
+[[1,1,1],
+ [0,1,0]],
+// Tミノ 下
+[[0,1,0],
+ [1,1,1]],
+// Tミノ 左
+[[0,1],[1,1],[0,1]],
+// Tミノ 右
+[[1,0],[1,1],[1,0]],
+[[1,0],[1,0],[1,1]],
+[[1,1,1],[1,0,0]],[[1,1],[0,1],[0,1]],[[0,0,1],[1,1,1]],
+[[0,1],[0,1],[1,1]],[[1,0,0],[1,1,1]],[[1,1],[1,0],[1,0]],
+[[1,1,1],[0,0,1]],[[1,1,1],[1,1,1]],[[1,1],[1,1],[1,1]],
+[[1,0,0],[1,0,0],[1,1,1]],[[1,1,1],[1,0,0],[1,0,0]],
+[[1,1,1],[0,0,1],[0,0,1]],[[0,0,1],[0,0,1],[1,1,1]],
+[[0,0,1],[0,1,0],[1,0,0]],[[1,0,0],[0,1,0],[0,0,1]],
+[[1,1,1],[1,1,1],[1,1,1]],[[1,1,1,1]],[[1],[1],[1],[1]],
+[[1,1,1,1,1]],[[1],[1],[1],[1],[1]],
+[[1,1,1,1,1,1]],[[1],[1],[1],[1],[1],[1]]
+];
+
+const selectedSlots=[null,null,null]; // b, c, d
+const list=document.getElementById("list");
+const slotArea=document.getElementById("slotArea");
+
+function draw(m, scale=14){
+  const c=document.createElement("canvas");
+  c.width=m[0].length*scale;
+  c.height=m.length*scale;
+  const ctx=c.getContext("2d");
+  m.forEach((r,y)=>r.forEach((v,x)=>{
+    if(v){
+      ctx.fillStyle="black";
+      ctx.fillRect(x*scale,y*scale,scale,scale);
+      ctx.strokeStyle="white";
+      ctx.strokeRect(x*scale,y*scale,scale,scale);
+    }
+  }));
+  return c;
+}
+
+shapes.forEach((m,i)=>{
+  const d=document.createElement("div");
+  d.className="canvasBox";
+  d.dataset.index=i;
+  d.appendChild(draw(m,14));
+
+  d.onclick=()=>{
+    const emptyIndex=selectedSlots.indexOf(null);
+    if(emptyIndex===-1) return;
+    selectedSlots[emptyIndex]=i;
+    update();
+  };
+
+  list.appendChild(d);
+});
+
+function renderSlots(){
+  slotArea.innerHTML="";
+  ["b","c","d"].forEach((name,idx)=>{
+    const slot=document.createElement("div");
+    slot.className="slot";
+
+    const label=document.createElement("div");
+    label.className="slotLabel";
+    label.textContent=name;
+    slot.appendChild(label);
+
+    const val=selectedSlots[idx];
+    if(val===null){
+      const empty=document.createElement("div");
+      empty.className="slotEmpty";
+      empty.textContent="空";
+      slot.appendChild(empty);
+    }else{
+      slot.appendChild(draw(shapes[val],14));
+    }
+
+    slot.onclick=()=>{
+      selectedSlots[idx]=null;
+      update();
+    };
+
+    slotArea.appendChild(slot);
+  });
+}
+
+function update(){
+  renderSlots();
+
+  const counts=selectedSlots.reduce((m,v)=>{
+    if(v!==null) m[v]=(m[v]||0)+1;
+    return m;
+  },{});
+
+  document.querySelectorAll(".canvasBox").forEach((d,i)=>{
+    d.classList.remove("selected");
+    const old=d.querySelector(".badge");
+    if(old) old.remove();
+
+    const count=counts[i]||0;
+    if(count>0){
+      d.classList.add("selected");
+      const badge=document.createElement("div");
+      badge.className="badge";
+      badge.textContent=count;
+      d.appendChild(badge);
+    }
+  });
+}
+
+renderSlots();
+
+function can(g,b,y,x){
+  for(let i=0;i<b.length;i++){
+    for(let j=0;j<b[0].length;j++){
+      if(b[i][j]&&g[y+i]?.[x+j]) return false;
+    }
+  }
+  return true;
+}
+
+function place(g,b,y,x){
+  let c=g.map(r=>[...r]);
+  for(let i=0;i<b.length;i++){
+    for(let j=0;j<b[0].length;j++){
+      if(b[i][j]) c[y+i][x+j]=1;
+    }
+  }
+  return c;
+}
+
+function clear(g){
+  for(let y=0;y<8;y++) if(g[y].every(v=>v)) for(let x=0;x<8;x++) g[y][x]=0;
+  for(let x=0;x<8;x++){
+    let ok=true;
+    for(let y=0;y<8;y++) if(!g[y][x]) ok=false;
+    if(ok) for(let y=0;y<8;y++) g[y][x]=0;
+  }
+  return g;
+}
+
+function run(){
+  if(selectedSlots.some(v=>v===null)) return;
+
+  const blocks=selectedSlots.map(i=>shapes[i]);
+  const colorMap=[0,1,2];
+  const orders=[[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]];
+  const seen=new Set();
+
+  let count=0;
+  let results=[];
+
+  for(const ord of orders){
+    const key=ord.map(i=>selectedSlots[i]).join(",");
+    if(seen.has(key)) continue;
+    seen.add(key);
+
+    const [i1,i2,i3]=ord;
+    const b=blocks[i1], c=blocks[i2], d=blocks[i3];
+
+    for(let y1=0;y1<=8-b.length;y1++)
+    for(let x1=0;x1<=8-b[0].length;x1++){
+      if(!can(a,b,y1,x1)) continue;
+      let g1=clear(place(a,b,y1,x1));
+
+      for(let y2=0;y2<=8-c.length;y2++)
+      for(let x2=0;x2<=8-c[0].length;x2++){
+        if(!can(g1,c,y2,x2)) continue;
+        let g2=clear(place(g1,c,y2,x2));
+
+        for(let y3=0;y3<=8-d.length;y3++)
+        for(let x3=0;x3<=8-d[0].length;x3++){
+          if(!can(g2,d,y3,x3)) continue;
+
+          count++;
+
+          if(results.length<10){
+            results.push({
+              steps:[
+                {m:b,y:y1,x:x1,color:colors[i1],order:i1},
+                {m:c,y:y2,x:x2,color:colors[i2],order:i2},
+                {m:d,y:y3,x:x3,color:colors[i3],order:i3}
+              ],
+              grid:clear(place(g2,d,y3,x3))
+            });
+          }
+
+          if(count>=150) break;
+        }
+        if(count>=150) break;
+      }
+      if(count>=150) break;
+    }
+    if(count>=150) break;
+  }
+
+  show(results,count);
+}
+
+function show(resList,count){
+  document.getElementById("selectScreen").classList.add("hidden");
+  document.getElementById("viewScreen").classList.remove("hidden");
+
+  const top=document.getElementById("viewTop");
+  top.innerHTML="";
+
+  if(resList.length===0){
+    const msg=document.createElement("div");
+    msg.textContent="表示できる答えがありません。";
+    top.appendChild(msg);
+  }else{
+    const res=resList[0];
+    const wrap=document.createElement("div");
+    wrap.style.display="flex";
+    wrap.style.gap="10px";
+    wrap.style.alignItems="center";
+
+    res.steps.forEach((s,i)=>{
+      const box=document.createElement("div");
+
+      s.m.forEach(r=>{
+        const row=document.createElement("div");
+        row.style.display="flex";
+        r.forEach(v=>{
+          const sq=document.createElement("div");
+          sq.style.width="15px";
+          sq.style.height="15px";
+          if(v) sq.style.background=s.color;
+          row.appendChild(sq);
+        });
+        box.appendChild(row);
+      });
+
+      const t=document.createElement("div");
+      t.textContent=`縦${s.y+1},横${s.x+1}`;
+      box.appendChild(t);
+
+      wrap.appendChild(box);
+      if(i<2){
+        const arr=document.createElement("div");
+        arr.textContent="→";
+        wrap.appendChild(arr);
+      }
+    });
+
+    top.appendChild(wrap);
+
+    const rg=document.getElementById("resultGrid");
+    rg.innerHTML="";
+
+    const cellData=Array.from({length:8},()=>Array.from({length:8},()=>[]));
+
+    res.steps.forEach(s=>{
+      for(let y=0;y<s.m.length;y++){
+        for(let x=0;x<s.m[0].length;x++){
+          if(s.m[y][x]) cellData[s.y+y][s.x+x].push(s.color);
+        }
+      }
+    });
+
+    for(let y=0;y<8;y++){
+      for(let x=0;x<8;x++){
+        const c=document.createElement("div");
+        c.className="cell";
+
+        const arr=cellData[y][x];
+        if(arr.length===0){
+          if(res.grid[y][x]) c.style.background="black";
+        }else if(arr.length===1){
+          c.style.background=arr[0];
+        }else if(arr.length===2){
+          c.style.background=`linear-gradient(45deg,${arr[0]} 50%,${arr[1]} 50%)`;
+        }else if(arr.length===3){
+          c.style.background=`conic-gradient(${arr[0]} 0 120deg,${arr[1]} 120deg 240deg,${arr[2]} 240deg 360deg)`;
+        }
+
+        rg.appendChild(c);
+      }
+    }
+  }
+
+  let level=(count<6)?"激ムズ":(count<21)?"まあムズ":"かんたんやろがい";
+  document.getElementById("count").textContent=`答え：${count>=150?"150+":count} 通り　むずさレベル：${level}`;
+
+  const mini=document.getElementById("mini");
+  mini.innerHTML="";
+
+  resList.forEach(r=>{
+    const box=document.createElement("div");
+    box.className="miniBox";
+
+    const m=document.createElement("div");
+    m.style.display="grid";
+    m.style.gridTemplateColumns="repeat(8,6px)";
+
+    for(let y=0;y<8;y++){
+      for(let x=0;x<8;x++){
+        const c=document.createElement("div");
+        c.style.width="6px";
+        c.style.height="6px";
+        c.style.border="1px solid #ccc";
+        if(r.grid[y][x]) c.style.background="black";
+        m.appendChild(c);
+      }
+    }
+
+    const txt=document.createElement("div");
+    txt.textContent=r.steps.map(s=>s.order+1).join("→");
+
+    box.appendChild(m);
+    box.appendChild(txt);
+    mini.appendChild(box);
+  });
+
+  if(count>10){
+    const more=document.createElement("div");
+    more.textContent="...";
+    mini.appendChild(more);
+  }
+}
+
+function back(){
+  document.getElementById("viewScreen").classList.add("hidden");
+  document.getElementById("selectScreen").classList.remove("hidden");
+}
+
+let lastEditKey=null;
+
+function applyCell(y,x){
+  const key=y+"_"+x;
+  if(lastEditKey===key) return;
+  lastEditKey=key;
+
+  saveHistory();
+
+  if(mode==="toggle") a[y][x]^=1;
+  if(mode==="on") a[y][x]=1;
+  if(mode==="off") a[y][x]=0;
+
+  drawEdit();
+}
+
+document.addEventListener("touchend",()=>{lastEditKey=null;});
+
+
+function setMode(m){
+  mode=m;
+  document.querySelectorAll(".ctrlBtn").forEach(b=>b.classList.remove("activeBtn"));
+  if(m==="toggle") document.getElementById("modeToggle").classList.add("activeBtn");
+  if(m==="on") document.getElementById("modeOn").classList.add("activeBtn");
+  if(m==="off") document.getElementById("modeOff").classList.add("activeBtn");
+}
+
+function clearAll(){
+  saveHistory();
+  for(let y=0;y<8;y++) for(let x=0;x<8;x++) a[y][x]=0;
+  drawEdit();
+}
+
+function invertAll(){
+  saveHistory();
+  for(let y=0;y<8;y++) for(let x=0;x<8;x++) a[y][x]^=1;
+  drawEdit();
+}
+let history=[];
+let future=[];
+
+function saveHistory(){
+  history.push(a.map(r=>[...r]));
+  if(history.length>50) history.shift();
+  future=[];
+}
+
+function undo(){
+  if(history.length===0) return;
+  future.push(a.map(r=>[...r]));
+  const prev=history.pop();
+  for(let y=0;y<8;y++) for(let x=0;x<8;x++) a[y][x]=prev[y][x];
+  drawEdit();
+}
+
+function redo(){
+  if(future.length===0) return;
+  history.push(a.map(r=>[...r]));
+  const next=future.pop();
+  for(let y=0;y<8;y++) for(let x=0;x<8;x++) a[y][x]=next[y][x];
+  drawEdit();
+}
+function redrawMainGrid(){
+  const cells = grid.children;
+  let i=0;
+  for(let y=0;y<8;y++){
+    for(let x=0;x<8;x++){
+      if(a[y][x]) cells[i].classList.add("active");
+      else cells[i].classList.remove("active");
+      i++;
+    }
+  }
+}
+document.addEventListener("touchmove",function(e){
+  if(document.body.classList.contains("noScroll")){
+    e.preventDefault();
+  }
+},{passive:false});
+</script>
+</body>
+</html>
